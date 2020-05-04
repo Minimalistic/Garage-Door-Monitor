@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import RPi.GPIO as GPIO
 import time
+import sys
 
 # Used to send to gmail
 from config import \
@@ -15,9 +16,9 @@ import urllib.request
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-
+garageOPEN = False
 # Get a distance reading from sonar sensor
-def getGarageDoorStatus():
+def garageDoorSensor():
     try:
         GPIO.setmode(GPIO.BOARD)
 
@@ -31,7 +32,7 @@ def getGarageDoorStatus():
 
         print("Waiting for sensor to settle")
 
-        time.sleep(2)
+        time.sleep(3)
 
         print("Calculating distance")
 
@@ -47,9 +48,14 @@ def getGarageDoorStatus():
             pulse_end_time = time.time()
 
         pulse_duration = pulse_end_time - pulse_start_time
-        distance = round(pulse_duration * 17150, 2)
-        print("Distance: ", round(distance/2.54, 2), "inches")
-
+        distance = round(round(pulse_duration * 17150, 2)/2.54, 2)
+        if distance < 10:
+            garageOPEN = True
+            print("Garage Door is ****OPEN****")
+        else:
+            garageOPEN = False
+            print("Garage Door is ****CLOSED****")
+        print("Distance: " + str(distance) + "inches")
     finally:
         GPIO.cleanup()
         
@@ -62,21 +68,34 @@ def emailAlert():
         server.starttls()
         server.login(email_sender_username, email_sender_password)
 
-        # For loop, sending emails to all recipients listed in config.py
-        for recipient in email_recipients:
-            print("Sending email to " + recipient)
-            message = MIMEMultipart('alternative')
-            message['From'] = email_sender_account
-            message['To'] = recipient
-            message['Subject'] = "Garage door has been left open! ID#59174592743"
-            message['Content-Type'] = 'text/html'
+        # Send emails to all recipients listed in config.py
+        print("Sending email to " + recipient)
+        message = MIMEMultipart('alternative')
+        message['From'] = email_sender_account
+        message['To'] = recipient
+        message['Subject'] = "Garage door has been left open! ID#59174592743"
+        message['Content-Type'] = 'text/html'
 
-            # This looks rather clunky
-            email_body = "Alert!"
-            message.attach(MIMEText(email_body, 'html'))
-            text = message.as_string()
-            server.sendmail(email_sender_account, recipient, text)
-            server.quit()
+        # This looks rather clunky
+        email_body = "Alert!"
+        message.attach(MIMEText(email_body, 'html'))
+        text = message.as_string()
+        server.sendmail(email_sender_account, recipient, text)
+        server.quit()
+        
+    except:
+        print("exception on emailAlert")
 
-getGarageDoorStatus()
-emailAlert()
+def garageMinion():
+    while True:
+        try:
+            garageDoorSensor()
+            time.sleep(2)
+            print("garageOPEN is set to: " + str(garageOPEN))
+        except KeyboardInterrupt:
+            print("Ending script")
+            sys.exit()
+
+garageMinion()
+
+#emailAlert()
