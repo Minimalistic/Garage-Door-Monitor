@@ -17,8 +17,11 @@ import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 garageOPEN = False
+
 # Get a distance reading from sonar sensor
 def garageDoorSensor():
+    global distance
+    global garageOPEN
     try:
         GPIO.setmode(GPIO.BOARD)
 
@@ -30,11 +33,11 @@ def garageDoorSensor():
 
         GPIO.output(PIN_TRIGGER, GPIO.LOW)
 
-        print("Waiting for sensor to settle")
+        # print("Waiting for sensor to settle")
 
-        time.sleep(3)
+        time.sleep(2)
 
-        print("Calculating distance")
+        # print("Calculating distance")
 
         GPIO.output(PIN_TRIGGER, GPIO.HIGH)
 
@@ -51,11 +54,8 @@ def garageDoorSensor():
         distance = round(round(pulse_duration * 17150, 2)/2.54, 2)
         if distance < 10:
             garageOPEN = True
-            print("Garage Door is ****OPEN****")
         else:
             garageOPEN = False
-            print("Garage Door is ****CLOSED****")
-        print("Distance: " + str(distance) + "inches")
     finally:
         GPIO.cleanup()
         
@@ -90,8 +90,12 @@ def garageMinion():
     while True:
         try:
             garageDoorSensor()
-            time.sleep(2)
-            print("garageOPEN is set to: " + str(garageOPEN))
+            # print(str(distance))
+            time.sleep(0.1)
+            if garageOPEN == True:
+                print("Start counting to prep to send notification")
+            else:
+                print("Nothing to report.")
         except KeyboardInterrupt:
             print("Ending script")
             sys.exit()
