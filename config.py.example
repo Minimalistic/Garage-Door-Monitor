@@ -1,0 +1,2 @@
+# IFTTT API ENDPOINT
+IFTTT_URL = 'http://maker.ifttt.com/trigger/YOUR_TIGGER_ALERT_GOES_HERE/with/key/YOUR_KEY_GOES_HERE'

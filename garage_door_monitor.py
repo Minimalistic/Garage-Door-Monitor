@@ -3,23 +3,20 @@ import RPi.GPIO as GPIO
 import time
 import sys
 
-# Used to send to gmail
-from config import \
-    email_sender_account, \
-    email_sender_username, \
-    email_sender_password, \
-    email_smtp_server,      \
-    email_smtp_port,        \
-    email_recipients
+# import URL and private key to send notifications to IFTTT
+from config import IFTTT_URL
 
-import urllib.request
-import smtplib
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
+# For determining time of day, whether to send an alert
+
+#for sending get to IFTTT
+import urllib3
+http = urllib3.PoolManager()
+
 garageOPEN = False
 
 # Get a distance reading from sonar sensor
 def garageDoorSensor():
+    # TODO Surely there's a better way to do this without declaring global variables like this.
     global distance
     global garageOPEN
     try:
@@ -30,15 +27,9 @@ def garageDoorSensor():
 
         GPIO.setup(PIN_TRIGGER, GPIO.OUT)
         GPIO.setup(PIN_ECHO, GPIO.IN)
-
         GPIO.output(PIN_TRIGGER, GPIO.LOW)
 
-        # print("Waiting for sensor to settle")
-
-        time.sleep(2)
-
-        # print("Calculating distance")
-
+        time.sleep(5)
         GPIO.output(PIN_TRIGGER, GPIO.HIGH)
 
         time.sleep(0.00001)
@@ -52,54 +43,45 @@ def garageDoorSensor():
 
         pulse_duration = pulse_end_time - pulse_start_time
         distance = round(round(pulse_duration * 17150, 2)/2.54, 2)
-        if distance < 10:
-            garageOPEN = True
-        else:
+        if distance > 60: # shorter distance = garage open due to door top
+                          # being closer to sensor.
             garageOPEN = False
+            print("Garage door is closed.")
+        else:
+            garageOPEN = True
     finally:
         GPIO.cleanup()
-        
-# Pass an alert via email
-def emailAlert():
-    try:
-        # Login to email service
-        server = smtplib.SMTP(email_smtp_server, email_smtp_port)
-        server.ehlo()
-        server.starttls()
-        server.login(email_sender_username, email_sender_password)
 
-        # Send emails to all recipients listed in config.py
-        print("Sending email to " + recipient)
-        message = MIMEMultipart('alternative')
-        message['From'] = email_sender_account
-        message['To'] = recipient
-        message['Subject'] = "Garage door has been left open! ID#59174592743"
-        message['Content-Type'] = 'text/html'
-
-        # This looks rather clunky
-        email_body = "Alert!"
-        message.attach(MIMEText(email_body, 'html'))
-        text = message.as_string()
-        server.sendmail(email_sender_account, recipient, text)
-        server.quit()
-        
-    except:
-        print("exception on emailAlert")
+def alertIFTTT():
+    http.request('GET', IFTTT_URL, timeout=15)
 
 def garageMinion():
+    timeOpen = 0
     while True:
         try:
             garageDoorSensor()
-            # print(str(distance))
-            time.sleep(0.1)
+            print("Sonar sensor returned " + str(distance) + " inches")
+            time.sleep(30) # Probably far too often of a sampling rate.
+                           # note - sampling more often than 4 seconds introduces
+                           # inconsistent readings
             if garageOPEN == True:
-                print("Start counting to prep to send notification")
+                timeOpen += 1
+                print("Garage door open for the last " + str(timeOpen) + " seconds.")
+                if timeOpen == 1800: # Door needs to be open for more than 15 minutes
+                    # TODO a condition based on time of day so it's not draconian
+                    try:
+                        alertIFTTT()
+                        #Resetting timer to ensure there's a repeated alert every hr
+                        time.sleep(1)
+                        timeOpen = 0 
+                        print("Garage door appears to have been closed, resetting timer.")
+                    except:
+                        print("some sorta error")
             else:
-                print("Nothing to report.")
+                timeOpen = 0
+
         except KeyboardInterrupt:
             print("Ending script")
             sys.exit()
 
 garageMinion()
-
-#emailAlert()
