@@ -20,6 +20,7 @@ def garageDoorSensor():
     global distance
     global garageOPEN
     try:
+        GPIO.setwarnings(False) # GPIO pins will probably complain from last time this script was run
         GPIO.setmode(GPIO.BOARD)
 
         PIN_TRIGGER = 7
@@ -57,31 +58,28 @@ def alertIFTTT():
 
 def garageMinion():
     timeOpen = 0
-    while True:
-        try:
-            garageDoorSensor()
-            print("Sonar sensor returned " + str(distance) + " inches")
-            time.sleep(30) # Probably far too often of a sampling rate.
-                           # note - sampling more often than 4 seconds introduces
-                           # inconsistent readings
-            if garageOPEN == True:
-                timeOpen += 1
-                print("Garage door open for the last " + str(timeOpen) + " seconds.")
-                if timeOpen == 1800: # Door needs to be open for more than 15 minutes
-                    # TODO a condition based on time of day so it's not draconian
-                    try:
-                        alertIFTTT()
-                        #Resetting timer to ensure there's a repeated alert every hr
-                        time.sleep(1)
-                        timeOpen = 0 
-                        print("Garage door appears to have been closed, resetting timer.")
-                    except:
-                        print("some sorta error")
-            else:
-                timeOpen = 0
+    try:
+        garageDoorSensor()
+        print("Sonar sensor returned " + str(distance) + " inches")
+        time.sleep(5)
 
-        except KeyboardInterrupt:
-            print("Ending script")
-            sys.exit()
+        if garageOPEN == True:
+            timeOpen += 1
+            print("Garage door open for the last " + str(timeOpen) + " seconds.")
+            if timeOpen == 1200: # Door needs to be open for more than 20 minutes
+                try:
+                    alertIFTTT()
+                    #Resetting timer to ensure there's a repeated alert every 30 mins
+                    time.sleep(1)
+                    timeOpen = 0 
+                    print("Garage door appears to have been closed, resetting timer.")
+                except:
+                    print("some sorta error")
+        else:
+            timeOpen = 0
+
+    except KeyboardInterrupt:
+        print("Ending script")
+        sys.exit()
 
 garageMinion()
