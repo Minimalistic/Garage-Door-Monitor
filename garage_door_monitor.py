@@ -30,7 +30,7 @@ def garageDoorSensor():
         GPIO.setup(PIN_ECHO, GPIO.IN)
         GPIO.output(PIN_TRIGGER, GPIO.LOW)
 
-        time.sleep(5)
+        time.sleep(2)
         GPIO.output(PIN_TRIGGER, GPIO.HIGH)
 
         time.sleep(0.00001)
@@ -44,10 +44,9 @@ def garageDoorSensor():
 
         pulse_duration = pulse_end_time - pulse_start_time
         distance = round(round(pulse_duration * 17150, 2)/2.54, 2)
-        if distance > 60: # shorter distance = garage open due to door top
+        if distance > 40: # shorter distance = garage open due to door top
                           # being closer to sensor.
             garageOPEN = False
-            print("Garage door is closed.")
         else:
             garageOPEN = True
     finally:
@@ -58,28 +57,32 @@ def alertIFTTT():
 
 def garageMinion():
     timeOpen = 0
-    try:
-        garageDoorSensor()
-        print("Sonar sensor returned " + str(distance) + " inches")
-        time.sleep(5)
+    while True:
+        try:
+            garageDoorSensor()
+            print("Sonar sensor returned " + str(distance) + " inches")
 
-        if garageOPEN == True:
-            timeOpen += 1
-            print("Garage door open for the last " + str(timeOpen) + " seconds.")
-            if timeOpen == 1200: # Door needs to be open for more than 20 minutes
-                try:
-                    alertIFTTT()
-                    #Resetting timer to ensure there's a repeated alert every 30 mins
-                    time.sleep(1)
-                    timeOpen = 0 
-                    print("Garage door appears to have been closed, resetting timer.")
-                except:
-                    print("some sorta error")
-        else:
-            timeOpen = 0
+            if garageOPEN == True:
+                timeOpen += 2 # adding 2 because sensor sampling rate is currently about 2 seconds due to the need to wait for sensor settling.
+                print("Garage door open for the last " + str(timeOpen) + " seconds.")
+                if timeOpen == 900: # Door needs to be open for more than 15 minutes
+                    try:
+                        alertIFTTT()
+                        #Resetting timer to ensure there's a repeated alert every 30 mins
+                        timeOpen = 0 
+                        print("Garage door alert has been sent, resetting timer.")
+                    except:
+                        print("some sorta error")
+                else:
+                    garageDoorSensor()
+            else:
+                print("Sonar sensor returned " + str(distance) + " inches")
+                timeOpen = 0
+                print("Garage door appears to have been closed, resetting timer.")
+                sys.exit()
 
-    except KeyboardInterrupt:
-        print("Ending script")
-        sys.exit()
+        except KeyboardInterrupt:
+            print("Ending script")
+            sys.exit()
 
 garageMinion()
