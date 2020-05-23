@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import RPi.GPIO as GPIO
+from datetime import datetime
 import time
 import sys
 
@@ -60,11 +61,9 @@ def garageMinion():
     while True:
         try:
             garageDoorSensor()
-            print("Sonar sensor returned " + str(distance) + " inches")
-
             if garageOPEN == True:
                 timeOpen += 2 # adding 2 because sensor sampling rate is currently about 2 seconds due to the need to wait for sensor settling.
-                print("Garage door open for the last " + str(timeOpen) + " seconds.")
+                print(str(datetime.now()) + " Garage door has been open for the last " + str(timeOpen) + " seconds.")
                 if timeOpen == 900: # Door needs to be open for more than 15 minutes
                     try:
                         alertIFTTT()
@@ -76,9 +75,8 @@ def garageMinion():
                 else:
                     garageDoorSensor()
             else:
-                print("Sonar sensor returned " + str(distance) + " inches")
+                print(str(datetime.now()) + " Sensor reading: " + str(distance) + " inches. Garage door is closed, timer reset.")
                 timeOpen = 0
-                print("Garage door appears to have been closed, resetting timer.")
                 sys.exit()
 
         except KeyboardInterrupt:
